@@ -238,7 +238,7 @@ with st.sidebar:
     st.title("🎛️ CONTROL PANEL")
     with st.form(key='analysis_form'):
         ticker_input = st.text_input("Kode Saham", "").upper()
-        analyze_btn = st.form_submit_button("MULAI ANALISA", type="primary")
+        analyze_btn = st.form_submit_button("ANALISA", type="primary")
     st.divider()
     st.info("💡 **Golden Time:** 09:15 - 11:30 WIB")
 
@@ -281,7 +281,7 @@ if analyze_btn and ticker_input:
         c1, c2 = st.columns([2, 1])
         with c1:
             # Tampilkan WIB NOW dan beri label UTC+7
-            st.markdown(f"🕒 Scan: {wib_now.strftime('%H:%M:%S')} UTC+7 | 🕯️ Candle: {last_candle_time_naive.strftime('%H:%M:%S')} | ⏳ Status: {delay_txt}", unsafe_allow_html=True)
+            st.markdown(f"🕒 Scan: {wib_now.strftime('%H:%M:%S')} | 🕯️ Candle: {last_candle_time_naive.strftime('%H:%M:%S')} | ⏳ Status: {delay_txt}", unsafe_allow_html=True)
         
         st.divider()
 
@@ -292,19 +292,20 @@ if analyze_btn and ticker_input:
         with col_main2:
             st.markdown(f"<div class='{res['rec_class']}'><div class='huge-font'>{res['rec_text']}</div><div>SKOR KUALITAS: {res['score']}/100</div></div>", unsafe_allow_html=True)
 
-        # --- SECTION: HASIL ANALISA (MOVED UP & OPENED) ---
-        st.markdown("<br><h5>🔍 HASIL ANALISA</h5>", unsafe_allow_html=True)
+        # --- SECTION: HASIL ANALISA (AUDIT) - FIXED DOUBLE ICON ---
+        st.markdown("<br><h5>🔍 HASIL ANALISA </h5>", unsafe_allow_html=True)
         with st.container():
             st.markdown('<div class="audit-box">', unsafe_allow_html=True)
             for r in res['reasons']:
+                # HAPUS ICON MANUAL DI SINI KARENA DI 'r' SUDAH ADA ICON
                 if "[BAHAYA]" in r or "[TREND] Bearish" in r or "[CONTROL] Harga <" in r or "Jualan Kuat" in r:
-                    st.markdown(f"<div style='margin-bottom:5px'>❌ <span class='c-red'>{r}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='margin-bottom:5px'><span class='c-red'>{r}</span></div>", unsafe_allow_html=True)
                 elif "[INFO]" in r or "Tren Lemah" in r or "Overbought" in r:
-                    st.markdown(f"<div style='margin-bottom:5px'>⚠️ <span class='c-yellow'>{r}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='margin-bottom:5px'><span class='c-yellow'>{r}</span></div>", unsafe_allow_html=True)
                 elif "[BREAKOUT]" in r:
-                    st.markdown(f"<div style='margin-bottom:5px'>🚀 <span class='c-magenta'>{r}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='margin-bottom:5px'><span class='c-magenta'>{r}</span></div>", unsafe_allow_html=True)
                 else:
-                    st.markdown(f"<div style='margin-bottom:5px'>✅ <span class='c-green'>{r}</span></div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='margin-bottom:5px'><span class='c-green'>{r}</span></div>", unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
         # --- SECTION: SESSION INTRADAY DATA ---
