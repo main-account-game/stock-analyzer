@@ -65,7 +65,6 @@ st.markdown("""
         border: 1px solid #333;
         padding: 15px;
         border-radius: 8px;
-        margin-bottom: 20px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -238,7 +237,7 @@ with st.sidebar:
     st.title("🎛️ CONTROL PANEL")
     with st.form(key='analysis_form'):
         ticker_input = st.text_input("Kode Saham", "").upper()
-        analyze_btn = st.form_submit_button("ANALISA", type="primary")
+        analyze_btn = st.form_submit_button("MULAI ANALISA", type="primary")
     st.divider()
     st.info("💡 **Golden Time:** 09:15 - 11:30 WIB")
 
@@ -369,9 +368,9 @@ if analyze_btn and ticker_input:
                 
                 st.markdown(f"""
                 <div class='metric-card' style='text-align:left'>
-                    <span class='c-green'>🎯 TARGET 1:</span> <b class='big-font'>{res['tp1']:.0f}</b> (+{g1:.1f}%)<br>
-                    <span class='c-green'>🚀 TARGET 2:</span> <b class='big-font'>{res['tp2']:.0f}</b> (+{g2:.1f}%)<br>
-                    <span class='c-magenta'>💎 JACKPOT :</span> <b class='big-font'>{res['tp3']:.0f}</b> (+{g3:.1f}%)
+                    <span class='c-green'>🎯 TP 1 :  </span> <b class='big-font'>{res['tp1']:.0f}</b> (+{g1:.1f}%)<br>
+                    <span class='c-green'>🚀 TP 2 :  </span> <b class='big-font'>{res['tp2']:.0f}</b> (+{g2:.1f}%)<br>
+                    <span class='c-magenta'>💎 GREEDY TP :  </span> <b class='big-font'>{res['tp3']:.0f}</b> (+{g3:.1f}%)
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -386,7 +385,7 @@ if analyze_btn and ticker_input:
             </div>
             """, unsafe_allow_html=True)
         else:
-            st.error("⛔ SETUP TIDAK VALID")
+            st.error("⛔ SETUP TIDAK VALID. JANGAN ENTRY!!!")
 
     elif status == "EMPTY":
         st.error("❌ Data tidak ditemukan. Cek kode saham.")
