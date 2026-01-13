@@ -9,12 +9,12 @@ from datetime import datetime, timedelta, timezone
 # ==========================================
 st.set_page_config(
     page_title="Stock Analyzer",
-    # page_icon="🎯",
+    page_icon="📈",
     # layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS untuk tampilan Dashboard Pro
+# Custom CSS
 st.markdown("""
 <style>
     /* Paksa Background Gelap */
@@ -58,11 +58,20 @@ st.markdown("""
         border-radius: 5px;
         margin-bottom: 10px;
     }
+    
+    /* Audit Box */
+    .audit-box {
+        background-color: #13161c;
+        border: 1px solid #333;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. LOGIC ENGINE (CORE CLI LOGIC)
+# 2. LOGIC ENGINE
 # ==========================================
 class GodModeEngine:
     def __init__(self, ticker):
@@ -72,7 +81,6 @@ class GodModeEngine:
 
     def fetch_data(self):
         try:
-            # Ambil data 5 hari, interval 5 menit
             self.df = yf.download(self.ticker, period="5d", interval="5m", progress=False)
             if self.df.empty: return "EMPTY"
             if len(self.df) < 50: return "FEW_DATA"
@@ -92,7 +100,6 @@ class GodModeEngine:
         else: tick = 25
         return round(price / tick) * tick
 
-    # --- RUMUS ADX MANUAL (AGAR SAMA PERSIS DENGAN CLI) ---
     def calculate_adx(self, window=14):
         df = self.df.copy()
         df['tr1'] = df['High'] - df['Low']
@@ -118,20 +125,17 @@ class GodModeEngine:
         return df['ADX']
 
     def analyze_market(self):
-        # Indikator Standard
         self.df['MA5'] = self.df['Close'].rolling(5).mean()
         self.df['MA20'] = self.df['Close'].rolling(20).mean()
         self.df['TPV'] = (self.df['High'] + self.df['Low'] + self.df['Close']) / 3 * self.df['Volume']
         self.df['VWAP'] = self.df['TPV'].cumsum() / self.df['Volume'].cumsum()
         
-        # MACD
         exp12 = self.df['Close'].ewm(span=12, adjust=False).mean()
         exp26 = self.df['Close'].ewm(span=26, adjust=False).mean()
         self.df['MACD'] = exp12 - exp26
         self.df['Signal'] = self.df['MACD'].ewm(span=9, adjust=False).mean()
         self.df['Hist'] = self.df['MACD'] - self.df['Signal']
 
-        # StochRSI
         delta = self.df['Close'].diff()
         gain = (delta.where(delta > 0, 0)).rolling(14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
@@ -141,7 +145,6 @@ class GodModeEngine:
         max_rsi = self.df['RSI'].rolling(14).max()
         self.df['StochRSI'] = (self.df['RSI'] - min_rsi) / (max_rsi - min_rsi)
 
-        # ADX & ATR
         self.df['ADX'] = self.calculate_adx()
         self.df['HighLow'] = self.df['High'] - self.df['Low']
         self.df['ATR'] = self.df['HighLow'].rolling(14).mean()
@@ -149,20 +152,17 @@ class GodModeEngine:
         self.df.dropna(inplace=True)
         row = self.df.iloc[-1]
         
-        # S/R (75 Candle / ~6 Jam)
         recent_high = self.df['High'].tail(75).max()
         recent_low = self.df['Low'].tail(75).min()
         res_price = self.round_price(recent_high)
         sup_price = self.round_price(recent_low)
         
-        # Volatility Check (Anti-Zombie)
         volatility_pct = ((recent_high - recent_low) / recent_low) * 100
         
         p = row['Close']
         score = 50
         reasons = []
 
-        # --- ZOMBIE FILTER ---
         is_zombie = False
         if volatility_pct < 2.0:
             is_zombie = True
@@ -171,7 +171,6 @@ class GodModeEngine:
         else:
             reasons.append(f"✅ [INFO] Volatilitas Sehat ({volatility_pct:.1f}%)")
 
-        # Analisa jika bukan Zombie
         if not is_zombie:
             if p > row['MA20']: score += 10; reasons.append("✅ [TREND] Bullish (Harga > MA20)")
             else: score -= 15; reasons.append("❌ [TREND] Bearish (Harga < MA20)")
@@ -193,7 +192,6 @@ class GodModeEngine:
 
         score = max(0, min(score, 100))
 
-        # Trade Plan Calculation
         sl_dist = row['ATR'] * 1.5
         raw_sl = p - sl_dist
         if (p - raw_sl) / p < 0.01: raw_sl = p * 0.985 
@@ -207,7 +205,6 @@ class GodModeEngine:
         tp2 = self.round_price(p + (risk * 3.0))
         tp3 = self.round_price(p + (risk * 5.0))
 
-        # Strategi & Styling Box
         if is_zombie:
             rec_text = "⛔ SAHAM TIDUR (ZOMBIE)"
             rec_class = "box-sell"
@@ -237,19 +234,14 @@ class GodModeEngine:
 # 3. INTERFACE DASHBOARD (WEB UI)
 # ==========================================
 
-# --- SIDEBAR (INPUT & TRIGGER) ---
 with st.sidebar:
     st.title("🎛️ CONTROL PANEL")
-    
-    # Form agar bisa submit pakai Enter
     with st.form(key='analysis_form'):
         ticker_input = st.text_input("Kode Saham", "").upper()
         analyze_btn = st.form_submit_button("MULAI ANALISA", type="primary")
-    
     st.divider()
     st.info("💡 **Golden Time:** 09:15 - 11:30 WIB")
 
-# --- MAIN EXECUTION ---
 if analyze_btn and ticker_input:
     bot = GodModeEngine(ticker_input)
     
@@ -261,7 +253,8 @@ if analyze_btn and ticker_input:
         d = res['data']
         p = d['Close']
         
-        # --- TIMEZONE FIX (UTC -> WIB) ---
+        # --- TIMEZONE FIX (UTC SERVER TO WIB) ---
+        # 1. Candle Time
         last_candle_time = d['Datetime'].to_pydatetime()
         if last_candle_time.tzinfo is not None:
             last_candle_time_utc = last_candle_time.astimezone(timezone.utc)
@@ -269,12 +262,16 @@ if analyze_btn and ticker_input:
             last_candle_time_naive = last_candle_time_wib.replace(tzinfo=None)
         else:
             last_candle_time_naive = last_candle_time
-
-        now = datetime.now()
-        diff = now - last_candle_time_naive
+            
+        # 2. Scan Time (Server Time + 7 Hours)
+        server_now = datetime.now(timezone.utc)
+        wib_now = server_now + timedelta(hours=7)
+        
+        # 3. Delay Calculation
+        # Gunakan wib_now (yang sudah timezone aware tapi naive-like) vs candle naive
+        diff = wib_now.replace(tzinfo=None) - last_candle_time_naive
         delay_min = int(diff.total_seconds() / 60)
         
-        # Status Delay HTML Color
         if delay_min <= 5: delay_txt = f"<span class='c-green'>Realtime (<5m)</span>"
         elif delay_min <= 20: delay_txt = f"<span class='c-yellow'>Delay Wajar ({delay_min}m)</span>"
         else: delay_txt = f"<span class='c-red'>MARKET TUTUP / DATA LAMA ({int(delay_min/60)}j {delay_min%60}m)</span>"
@@ -283,42 +280,43 @@ if analyze_btn and ticker_input:
         st.markdown(f"### ⚡ ANALISA SAHAM: {ticker_input}")
         c1, c2 = st.columns([2, 1])
         with c1:
-            st.markdown(f"🕒 Scan: {now.strftime('%H:%M:%S')} | 🕯️ Candle: {last_candle_time_naive.strftime('%H:%M:%S')} | ⏳ Status: {delay_txt}", unsafe_allow_html=True)
+            # Tampilkan WIB NOW dan beri label UTC+7
+            st.markdown(f"🕒 Scan: {wib_now.strftime('%H:%M:%S')} UTC+7 | 🕯️ Candle: {last_candle_time_naive.strftime('%H:%M:%S')} | ⏳ Status: {delay_txt}", unsafe_allow_html=True)
         
         st.divider()
 
         # --- TOP SECTION: PRICE & REKOMENDASI ---
         col_main1, col_main2 = st.columns([1, 2])
-        
         with col_main1:
-            st.markdown(f"""
-            <div class='metric-card'>
-                <div class='label-font'>HARGA SAAT INI</div>
-                <div class='huge-font'>{p:.0f}</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
+            st.markdown(f"<div class='metric-card'><div class='label-font'>HARGA SAAT INI</div><div class='huge-font'>{p:.0f}</div></div>", unsafe_allow_html=True)
         with col_main2:
-            st.markdown(f"""
-            <div class='{res['rec_class']}'>
-                <div class='huge-font'>{res['rec_text']}</div>
-                <div>SKOR KUALITAS: {res['score']}/100</div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f"<div class='{res['rec_class']}'><div class='huge-font'>{res['rec_text']}</div><div>SKOR KUALITAS: {res['score']}/100</div></div>", unsafe_allow_html=True)
+
+        # --- SECTION: HASIL ANALISA (MOVED UP & OPENED) ---
+        st.markdown("<br><h5>🔍 HASIL ANALISA</h5>", unsafe_allow_html=True)
+        with st.container():
+            st.markdown('<div class="audit-box">', unsafe_allow_html=True)
+            for r in res['reasons']:
+                if "[BAHAYA]" in r or "[TREND] Bearish" in r or "[CONTROL] Harga <" in r or "Jualan Kuat" in r:
+                    st.markdown(f"<div style='margin-bottom:5px'>❌ <span class='c-red'>{r}</span></div>", unsafe_allow_html=True)
+                elif "[INFO]" in r or "Tren Lemah" in r or "Overbought" in r:
+                    st.markdown(f"<div style='margin-bottom:5px'>⚠️ <span class='c-yellow'>{r}</span></div>", unsafe_allow_html=True)
+                elif "[BREAKOUT]" in r:
+                    st.markdown(f"<div style='margin-bottom:5px'>🚀 <span class='c-magenta'>{r}</span></div>", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"<div style='margin-bottom:5px'>✅ <span class='c-green'>{r}</span></div>", unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
         # --- SECTION: SESSION INTRADAY DATA ---
-        st.markdown("<br><h5>📊 SESSION INTRADAY DATA</h5>", unsafe_allow_html=True)
+        st.markdown("<h5>📊 DATA SESSION INTRADAY</h5>", unsafe_allow_html=True)
         m1, m2, m3 = st.columns(3)
         
-        # Logic Warna S/R
         res_color = "c-magenta" if p >= res['resistance'] else "c-red"
         res_label = "🚀 BREAKOUT!" if p >= res['resistance'] else "Atap Harian"
         
-        with m1:
-             st.markdown(f"<div class='metric-card'><span class='label-font'>RESISTANCE</span><br><span class='big-font {res_color}'>{res['resistance']:.0f}</span><br><small>{res_label}</small></div>", unsafe_allow_html=True)
-        with m2:
-             st.markdown(f"<div class='metric-card'><span class='label-font'>SUPPORT</span><br><span class='big-font c-green'>{res['support']:.0f}</span><br><small>Lantai Harian</small></div>", unsafe_allow_html=True)
-        with m3:
+        with m1: st.markdown(f"<div class='metric-card'><span class='label-font'>RESISTANCE</span><br><span class='big-font {res_color}'>{res['resistance']:.0f}</span><br><small>{res_label}</small></div>", unsafe_allow_html=True)
+        with m2: st.markdown(f"<div class='metric-card'><span class='label-font'>SUPPORT</span><br><span class='big-font c-green'>{res['support']:.0f}</span><br><small>Lantai Harian</small></div>", unsafe_allow_html=True)
+        with m3: 
              vol_cls = "c-green" if res['volatility'] >= 2.0 else "c-red"
              st.markdown(f"<div class='metric-card'><span class='label-font'>VOLATILITAS</span><br><span class='big-font {vol_cls}'>{res['volatility']:.2f}%</span><br><small>Range Harian</small></div>", unsafe_allow_html=True)
 
@@ -340,7 +338,7 @@ if analyze_btn and ticker_input:
             st.error("⛔ ALASAN PENOLAKAN: Saham Tidur (Range Gerak < 2%). Hindari!")
         
         elif "AVOID" not in res['rec_text']:
-            st.markdown("<br><h5>📋 TRADE PLAN DETAIL (ANGKA)</h5>", unsafe_allow_html=True)
+            st.markdown("<br><h5>📋 TRADE PLAN DETAIL</h5>", unsafe_allow_html=True)
             
             p1, p2 = st.columns([1, 1])
             entry_min = bot.round_price(min(p, d['MA5']))
@@ -369,7 +367,7 @@ if analyze_btn and ticker_input:
 
             # VALIDASI AKHIR
             st.markdown("""
-            <div style='background-color:#332b00; padding:15px; border-radius:5px; border:1px solid #FFEB3B;'>
+            <div style='background-color:#332b00; padding:15px; margin-top:10px; border-radius:5px; border:1px solid #FFEB3B;'>
                 <b class='c-yellow'>⚠️ VALIDASI AKHIR (WAJIB CEK MANUAL):</b><br>
                 1. <span class='c-cyan'>ORDER BOOK</span>: Bid Tebal? Offer Dimakan?<br>
                 2. <span class='c-cyan'>BANDARMOLOGY</span>: Top Buyer = Institusi/Asing?<br>
@@ -377,21 +375,8 @@ if analyze_btn and ticker_input:
                 <b>>>> JIKA SEMUA VALID, EKSEKUSI SESUAI PLAN DI ATAS. <<<</b>
             </div>
             """, unsafe_allow_html=True)
-        
         else:
-            st.error("⛔ SETUP TIDAK VALID. Lihat Audit Log di bawah.")
-
-        # --- AUDIT LOG ---
-        with st.expander("🔍 Lihat Detail Audit Skor"):
-            for r in res['reasons']:
-                if "[BAHAYA]" in r or "[TREND] Bearish" in r or "[CONTROL] Harga <" in r or "Jualan Kuat" in r:
-                    st.markdown(f"<span class='c-red'>{r}</span>", unsafe_allow_html=True)
-                elif "[INFO]" in r or "Tren Lemah" in r or "Overbought" in r:
-                    st.markdown(f"<span class='c-yellow'>{r}</span>", unsafe_allow_html=True)
-                elif "[BREAKOUT]" in r:
-                    st.markdown(f"<span class='c-magenta'>{r}</span>", unsafe_allow_html=True)
-                else:
-                    st.markdown(f"<span class='c-green'>{r}</span>", unsafe_allow_html=True)
+            st.error("⛔ SETUP TIDAK VALID")
 
     elif status == "EMPTY":
         st.error("❌ Data tidak ditemukan. Cek kode saham.")
@@ -400,6 +385,5 @@ if analyze_btn and ticker_input:
     else:
         st.error(f"❌ Error System: {status}")
 else:
-    # State awal
     if not ticker_input:
         st.info("👈 Masukkan Kode Saham di Sidebar dan Tekan Enter untuk memulai.")
