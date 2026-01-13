@@ -292,24 +292,33 @@ if analyze_btn and ticker_input:
         with col_main2:
             st.markdown(f"<div class='{res['rec_class']}'><div class='huge-font'>{res['rec_text']}</div><div>SKOR KUALITAS: {res['score']}/100</div></div>", unsafe_allow_html=True)
 
-        # --- SECTION: HASIL ANALISA (AUDIT) - FIXED DOUBLE ICON ---
+        # --- SECTION: HASIL ANALISA (AUDIT) - FIXED RENDER ---
         st.markdown("<br><h5>🔍 HASIL ANALISA </h5>", unsafe_allow_html=True)
-        with st.container():
-            st.markdown('<div class="audit-box">', unsafe_allow_html=True)
-            for r in res['reasons']:
-                # HAPUS ICON MANUAL DI SINI KARENA DI 'r' SUDAH ADA ICON
-                if "[BAHAYA]" in r or "[TREND] Bearish" in r or "[CONTROL] Harga <" in r or "Jualan Kuat" in r:
-                    st.markdown(f"<div style='margin-bottom:5px'><span class='c-red'>{r}</span></div>", unsafe_allow_html=True)
-                elif "[INFO]" in r or "Tren Lemah" in r or "Overbought" in r:
-                    st.markdown(f"<div style='margin-bottom:5px'><span class='c-yellow'>{r}</span></div>", unsafe_allow_html=True)
-                elif "[BREAKOUT]" in r:
-                    st.markdown(f"<div style='margin-bottom:5px'><span class='c-magenta'>{r}</span></div>", unsafe_allow_html=True)
-                else:
-                    st.markdown(f"<div style='margin-bottom:5px'><span class='c-green'>{r}</span></div>", unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+        
+        # FIX: Generate HTML string lengkap dulu baru di-render
+        audit_html = '<div class="audit-box">'
+        for r in res['reasons']:
+            # Tentukan warna teks berdasarkan keyword
+            # Note: Icon sudah ada di dalam string 'r', jadi tidak perlu tambah icon lagi.
+            if "[BAHAYA]" in r or "[TREND] Bearish" in r or "[CONTROL] Harga <" in r or "Jualan Kuat" in r:
+                text_cls = "c-red"
+            elif "[INFO]" in r or "Tren Lemah" in r or "Overbought" in r:
+                text_cls = "c-yellow"
+            elif "[BREAKOUT]" in r:
+                text_cls = "c-magenta"
+            else:
+                text_cls = "c-green"
+            
+            # Tambahkan baris ke HTML string
+            audit_html += f'<div style="margin-bottom:5px"><span class="{text_cls}">{r}</span></div>'
+        
+        audit_html += '</div>'
+        
+        # Render satu kali saja
+        st.markdown(audit_html, unsafe_allow_html=True)
 
         # --- SECTION: SESSION INTRADAY DATA ---
-        st.markdown("<h5>📊 DATA SESSION INTRADAY</h5>", unsafe_allow_html=True)
+        st.markdown("<br><h5>📊 DATA SESSION INTRADAY</h5>", unsafe_allow_html=True)
         m1, m2, m3 = st.columns(3)
         
         res_color = "c-magenta" if p >= res['resistance'] else "c-red"
@@ -322,7 +331,7 @@ if analyze_btn and ticker_input:
              st.markdown(f"<div class='metric-card'><span class='label-font'>VOLATILITAS</span><br><span class='big-font {vol_cls}'>{res['volatility']:.2f}%</span><br><small>Range Harian</small></div>", unsafe_allow_html=True)
 
         # --- SECTION: DATA INDIKATOR ---
-        st.markdown("<h5>📈 DATA INDIKATOR</h5>", unsafe_allow_html=True)
+        st.markdown("<br><h5>📈 DATA INDIKATOR</h5>", unsafe_allow_html=True)
         i1, i2, i3, i4 = st.columns(4)
         
         vwap_cls = "c-green" if p > d['VWAP'] else "c-red"
