@@ -2,12 +2,67 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
-# --- CONFIG ---
-st.set_page_config(page_title="God Mode: Sniper Advisor", page_icon="🎯", layout="centered")
+# ==========================================
+# 🎨 KONFIGURASI HALAMAN (WAJIB DI ATAS)
+# ==========================================
+st.set_page_config(
+    page_title="GOD MODE: SNIPER",
+    page_icon="🎯",
+    layout="wide", # Pakai seluruh lebar layar
+    initial_sidebar_state="expanded"
+)
 
-# --- CLASS DEFINITION (Sama seperti sebelumnya, dimodifikasi outputnya) ---
+# Custom CSS untuk Dark Mode & Card Style
+st.markdown("""
+<style>
+    .metric-card {
+        background-color: #1e1e1e;
+        border: 1px solid #333;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+    .big-font { font-size: 24px !important; font-weight: bold; }
+    .med-font { font-size: 18px !important; }
+    .green-text { color: #00ff00; }
+    .red-text { color: #ff4b4b; }
+    .yellow-text { color: #ffeb3b; }
+    .magenta-text { color: #d500f9; }
+    
+    /* Highlight Box untuk Rekomendasi */
+    .rec-box-buy {
+        background-color: #06402b;
+        color: #00ff00;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        border: 2px solid #00ff00;
+    }
+    .rec-box-sell {
+        background-color: #4a0d0d;
+        color: #ff4b4b;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        border: 2px solid #ff4b4b;
+    }
+    .rec-box-wait {
+        background-color: #423d08;
+        color: #ffeb3b;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        border: 2px solid #ffeb3b;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# 🧠 LOGIC ENGINE (SAMA SEPERTI CLI)
+# ==========================================
 class GodModeWeb:
     def __init__(self, ticker):
         self.clean_ticker = ticker.upper().replace('.JK', '')
@@ -35,14 +90,14 @@ class GodModeWeb:
         return round(price / tick) * tick
 
     def analyze(self):
-        # (LOGIC HITUNGAN SAMA PERSIS DENGAN SEBELUMNYA)
         df = self.df
+        # Indikator
         df['MA5'] = df['Close'].rolling(5).mean()
         df['MA20'] = df['Close'].rolling(20).mean()
         df['TPV'] = (df['High'] + df['Low'] + df['Close']) / 3 * df['Volume']
         df['VWAP'] = df['TPV'].cumsum() / df['Volume'].cumsum()
         
-        # ADX Manual Calc
+        # ADX Manual
         df['tr1'] = df['High'] - df['Low']
         df['tr2'] = abs(df['High'] - df['Close'].shift(1))
         df['tr3'] = abs(df['Low'] - df['Close'].shift(1))
@@ -59,7 +114,7 @@ class GodModeWeb:
         df['dx'] = 100 * abs(df['plus_di'] - df['minus_di']) / (df['plus_di'] + df['minus_di'])
         df['ADX'] = df['dx'].ewm(alpha=1/14, adjust=False).mean()
 
-        # Indicators
+        # StochRSI & ATR
         delta = df['Close'].diff()
         gain = (delta.where(delta > 0, 0)).rolling(14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
@@ -75,7 +130,7 @@ class GodModeWeb:
         df.dropna(inplace=True)
         row = df.iloc[-1]
         
-        # S/R 75 Candle
+        # 75 Candle S/R
         recent_high = df['High'].tail(75).max()
         recent_low = df['Low'].tail(75).min()
         res_price = self.round_price(recent_high)
@@ -83,37 +138,36 @@ class GodModeWeb:
         volatility_pct = ((recent_high - recent_low) / recent_low) * 100
 
         p = row['Close']
+        
+        # SCORING
         score = 50
         reasons = []
 
-        # Zombie Filter
         is_zombie = False
         if volatility_pct < 2.0:
             is_zombie = True
             score = 0
-            reasons.append("⛔ SAHAM TIDUR (Gerak < 2% Seharian)")
-        else:
-            reasons.append(f"✅ Volatilitas Sehat ({volatility_pct:.2f}%)")
-
+            reasons.append("⛔ SAHAM ZOMBIE (Gerak < 2%)")
+        
         if not is_zombie:
-            if p > row['MA20']: score += 10; reasons.append("✅ Bullish Trend (> MA20)")
-            else: score -= 15; reasons.append("❌ Bearish Trend (< MA20)")
+            if p > row['MA20']: score += 10; reasons.append("✅ Trend Bullish (> MA20)")
+            else: score -= 15; reasons.append("❌ Trend Bearish (< MA20)")
             
-            if p > row['VWAP']: score += 10; reasons.append("✅ Buyer Dominan (> VWAP)")
-            else: score -= 10; reasons.append("❌ Seller Dominan (< VWAP)")
+            if p > row['VWAP']: score += 10; reasons.append("✅ Dominasi Buyer (> VWAP)")
+            else: score -= 10; reasons.append("❌ Dominasi Seller (< VWAP)")
             
             if row['ADX'] > 25: 
                 if p > row['MA20']: score += 10; reasons.append("✅ Power Kuat (ADX > 25)")
-                else: score -= 10; reasons.append("❌ Tekanan Jual Kuat")
+                else: score -= 10; reasons.append("❌ Jualan Kuat")
             
             if row['StochRSI'] < 0.2: score += 10; reasons.append("✅ Oversold (Murah)")
             elif row['StochRSI'] > 0.8: score -= 5; reasons.append("⚠️ Overbought (Mahal)")
             
-            if p >= res_price: score += 5; reasons.append("🚀 BREAKOUT RESISTANCE!")
+            if p >= res_price: score += 5; reasons.append("🚀 BREAKOUT DAY HIGH!")
 
         score = max(0, min(score, 100))
         
-        # Trade Plan
+        # PLAN
         sl_dist = row['ATR'] * 1.5
         raw_sl = p - sl_dist
         if (p - raw_sl) / p < 0.01: raw_sl = p * 0.985
@@ -121,95 +175,205 @@ class GodModeWeb:
         if sl_final >= p: sl_final = p - (2 if p<200 else 5)
         
         risk = p - sl_final
+        risk_pct = (risk/p)*100
         tp1 = self.round_price(p + (risk * 1.5))
         tp2 = self.round_price(p + (risk * 3.0))
         tp3 = self.round_price(p + (risk * 5.0))
 
-        # Strategi
-        if is_zombie: strategy = "AVOID"
-        elif score >= 75: strategy = "GAS POL (Aggressive)"
-        elif score >= 60: strategy = "BUY ON WEAKNESS"
-        elif score >= 40: strategy = "WAIT / SPECULATIVE"
-        else: strategy = "AVOID / SELL"
+        if is_zombie: 
+            rec_text = "AVOID / ZOMBIE"
+            rec_style = "rec-box-sell"
+        elif score >= 75: 
+            rec_text = "🚀 GAS POL / AGGRESSIVE"
+            rec_style = "rec-box-buy"
+        elif score >= 60: 
+            rec_text = "✅ BUY ON WEAKNESS"
+            rec_style = "rec-box-buy"
+        elif score >= 40: 
+            rec_text = "⚠️ SPECULATIVE / WAIT"
+            rec_style = "rec-box-wait"
+        else: 
+            rec_text = "⛔ AVOID / SELL"
+            rec_style = "rec-box-sell"
 
         return {
             'data': row, 'score': score, 'reasons': reasons,
-            'sl': sl_final, 'tp1': tp1, 'tp2': tp2, 'tp3': tp3,
-            'strategy': strategy, 'support': sup_price, 'resistance': res_price,
+            'sl': sl_final, 'risk_pct': risk_pct,
+            'tp1': tp1, 'tp2': tp2, 'tp3': tp3,
+            'rec_text': rec_text, 'rec_style': rec_style,
+            'support': sup_price, 'resistance': res_price,
             'is_zombie': is_zombie, 'volatility': volatility_pct
         }
 
-# --- UI STREAMLIT ---
-st.title("🎯 God Mode: Sniper Advisor")
-st.caption("Brutal Honest Trading Assistant")
+# ==========================================
+# 🖥️ TAMPILAN DASHBOARD (UI CODE)
+# ==========================================
 
-ticker_input = st.text_input("Masukkan Kode Saham (Contoh: BBRI, ANTM)", "").upper()
+# Sidebar
+with st.sidebar:
+    st.title("🎛️ CONTROL PANEL")
+    ticker_input = st.text_input("Kode Saham", "").upper()
+    analyze_btn = st.button("🚀 ANALISA SEKARANG", type="primary")
+    st.markdown("---")
+    st.info("💡 **Tips:** Gunakan jam 09:15 - 11:30 untuk hasil terbaik.")
 
-if st.button("Analisa Sekarang"):
-    if not ticker_input:
-        st.error("Masukkan kode saham dulu!")
-    else:
-        with st.spinner(f"Mengaudit {ticker_input}..."):
-            bot = GodModeWeb(ticker_input)
-            status = bot.fetch_data()
+if analyze_btn and ticker_input:
+    bot = GodModeWeb(ticker_input)
+    
+    with st.spinner('📡 Mengambil data...'):
+        status = bot.fetch_data()
+
+    if status == "OK":
+        res = bot.analyze()
+        d = res['data']
+        p = d['Close']
+        
+        # --- HEADER SECTION ---
+        col_h1, col_h2 = st.columns([1, 3])
+        with col_h1:
+            st.metric("HARGA SAAT INI", f"{p:.0f}")
+        with col_h2:
+            st.markdown(f"""
+            <div class="{res['rec_style']}">
+                <div class="big-font">{res['rec_text']}</div>
+                <div class="med-font">SKOR KUALITAS: {res['score']}/100</div>
+            </div>
+            """, unsafe_allow_html=True)
             
-            if status == "OK":
-                res = bot.analyze()
-                d = res['data']
-                p = d['Close']
+        st.markdown("---")
 
-                # 1. Header Metrics
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Harga Last", f"{p:.0f}")
-                col2.metric("Skor Kualitas", f"{res['score']}/100")
-                col3.metric("Status", res['strategy'])
+        # --- TECHNICAL COCKPIT (GRID) ---
+        st.subheader("📊 DASHBOARD INDIKATOR")
+        
+        # Logic Warna Text
+        trend_clr = "green-text" if p > d['MA20'] else "red-text"
+        vwap_clr = "green-text" if p > d['VWAP'] else "red-text"
+        adx_clr = "green-text" if d['ADX'] > 25 else "yellow-text"
+        stoch_clr = "green-text" if d['StochRSI'] < 0.2 else ("red-text" if d['StochRSI'] > 0.8 else "yellow-text")
 
-                # 2. Peta Perang
-                st.subheader("🛡️ Peta Perang (Intraday)")
-                c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
+        
+        with c1:
+            st.markdown(f"""
+            <div class="metric-card">
+                <small>TREND (MA20)</small><br>
+                <span class="big-font {trend_clr}">{d['MA20']:.0f}</span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with c2:
+            st.markdown(f"""
+            <div class="metric-card">
+                <small>BANDAR (VWAP)</small><br>
+                <span class="big-font {vwap_clr}">{d['VWAP']:.0f}</span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with c3:
+            st.markdown(f"""
+            <div class="metric-card">
+                <small>POWER (ADX)</small><br>
+                <span class="big-font {adx_clr}">{d['ADX']:.1f}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with c4:
+            st.markdown(f"""
+            <div class="metric-card">
+                <small>TIMING (STOCH)</small><br>
+                <span class="big-font {stoch_clr}">{d['StochRSI']:.2f}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # --- BATTLEFIELD MAP ---
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.subheader("⚔️ S/R INTRADAY")
+        
+        b1, b2, b3 = st.columns(3)
+        with b1:
+             st.markdown(f"""
+            <div class="metric-card" style="border-color: #ff4b4b;">
+                <small style="color:#ff4b4b">RESISTANCE (ATAP)</small><br>
+                <span class="big-font">{res['resistance']:.0f}</span>
+            </div>
+            """, unsafe_allow_html=True)
+        with b2:
+             st.markdown(f"""
+            <div class="metric-card" style="border-color: #00ff00;">
+                <small style="color:#00ff00">SUPPORT (LANTAI)</small><br>
+                <span class="big-font">{res['support']:.0f}</span>
+            </div>
+            """, unsafe_allow_html=True)
+        with b3:
+             st.markdown(f"""
+            <div class="metric-card">
+                <small>VOLATILITAS</small><br>
+                <span class="big-font">{res['volatility']:.2f}%</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # --- TRADE PLAN SECTION ---
+        if not res['is_zombie'] and "AVOID" not in res['rec_text']:
+            st.markdown("---")
+            st.subheader("📋 TRADE PLAN")
+            
+            entry_min = bot.round_price(min(p, d['MA5']))
+            entry_max = bot.round_price(max(p, d['MA5']))
+            
+            # Tampilan Plan dalam Kolom
+            p1, p2 = st.columns([1, 1])
+            
+            with p1:
+                st.markdown(f"""
+                <div style="background:#0e1117; padding:15px; border-radius:10px; border-left: 5px solid cyan;">
+                    <h4 style="margin:0; color:cyan;">🛒 ENTRY AREA</h4>
+                    <span class="big-font">{entry_min:.0f} - {entry_max:.0f}</span>
+                </div>
+                <br>
+                <div style="background:#0e1117; padding:15px; border-radius:10px; border-left: 5px solid red;">
+                    <h4 style="margin:0; color:#ff4b4b;">🛡️ STOP LOSS</h4>
+                    <span class="big-font">{res['sl']:.0f}</span> <small>(Risk: -{res['risk_pct']:.2f}%)</small>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                # Logic warna Resistance
-                if p >= res['resistance']:
-                    c1.warning(f"Resist: {res['resistance']:.0f} (BREAKOUT!)")
-                else:
-                    c1.info(f"Resist: {res['resistance']:.0f}")
-                    
-                c2.success(f"Support: {res['support']:.0f}")
-                c3.info(f"Volatilitas: {res['volatility']:.2f}%")
+            with p2:
+                # Menghitung Gain Persen
+                g1 = ((res['tp1'] - p) / p) * 100
+                g2 = ((res['tp2'] - p) / p) * 100
+                g3 = ((res['tp3'] - p) / p) * 100
+                
+                st.markdown(f"""
+                <div style="background:#0e1117; padding:10px; border-radius:5px; margin-bottom:5px;">
+                    <span style="color:#00ff00;">🎯 TARGET 1:</span> <b>{res['tp1']:.0f}</b> (+{g1:.1f}%)
+                </div>
+                <div style="background:#0e1117; padding:10px; border-radius:5px; margin-bottom:5px;">
+                    <span style="color:#00ff00;">🚀 TARGET 2:</span> <b>{res['tp2']:.0f}</b> (+{g2:.1f}%)
+                </div>
+                <div style="background:#0e1117; padding:10px; border-radius:5px; margin-bottom:5px;">
+                    <span style="color:#d500f9;">💎 JACKPOT :</span> <b>{res['tp3']:.0f}</b> (+{g3:.1f}%)
+                </div>
+                """, unsafe_allow_html=True)
+                
+            # VALIDASI AKHIR
+            st.warning("⚠️ **VALIDASI MANUSIA:** Cek Order Book (Bid Tebal) & Broker Summary (Akumulasi) sebelum Entry!")
 
-                # 3. Indikator
-                st.markdown("---")
-                st.write("**Data Indikator:**")
-                st.text(f"VWAP: {d['VWAP']:.0f} | MA5: {d['MA5']:.0f} | ADX: {d['ADX']:.1f}")
+        elif res['is_zombie']:
+            st.error("⛔ SAHAM ZOMBIE DETECTED: Jangan entry, fee transaksi akan memakan modal Anda.")
+            
+        else:
+            st.error("⛔ SETUP TIDAK VALID: Tunggu harga naik ke atas MA20 atau VWAP.")
 
-                # 4. Alasan
-                st.markdown("---")
-                st.write("**Audit Log:**")
-                for r in res['reasons']:
-                    st.write(f"- {r}")
+        # --- AUDIT LOG ---
+        with st.expander("🔍 Lihat Detail Audit Skor (Kenapa angka ini muncul?)"):
+            for r in res['reasons']:
+                st.write(r)
 
-                # 5. Trade Plan
-                if not res['is_zombie'] and "AVOID" not in res['strategy']:
-                    st.markdown("---")
-                    st.subheader("📋 Trade Plan")
-                    
-                    st.success(f"🛒 **ENTRY AREA:** {bot.round_price(min(p, d['MA5'])):.0f} - {bot.round_price(max(p, d['MA5'])):.0f}")
-                    st.error(f"🛡️ **STOP LOSS:** {res['sl']:.0f}")
-                    
-                    t1, t2, t3 = st.columns(3)
-                    t1.metric("Target 1", f"{res['tp1']:.0f}")
-                    t2.metric("Target 2", f"{res['tp2']:.0f}")
-                    t3.metric("Target 3", f"{res['tp3']:.0f}")
-                    
-                    st.warning("⚠️ **VALIDASI MANUSIA:** Cek Order Book & Bandarmology sebelum Entry!")
-                elif res['is_zombie']:
-                    st.error("⛔ SAHAM ZOMBIE. Cari yang lain.")
-                else:
-                    st.error("⛔ JANGAN MASUK. Tren Jelek.")
+    elif status == "EMPTY":
+        st.error("❌ Data Tidak Ditemukan. Cek kode saham.")
+    elif status == "FEW_DATA":
+        st.error("❌ Data Terlalu Sedikit (Saham Baru IPO).")
+    else:
+        st.error(f"❌ Error: {status}")
 
-            elif status == "EMPTY":
-                st.error("Data saham tidak ditemukan / Error Koneksi.")
-            elif status == "FEW_DATA":
-                st.error("Data saham terlalu sedikit (Baru IPO?).")
-            else:
-                st.error(f"Error System: {status}")
+else:
+    st.info("👈 Masukkan Kode Saham di Sidebar sebelah kiri untuk memulai.")
