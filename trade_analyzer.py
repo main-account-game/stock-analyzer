@@ -10,11 +10,11 @@ from datetime import datetime, timedelta, timezone
 st.set_page_config(
     page_title="Stock Daytrade Analyzer",
     page_icon="📈",
-    # layout="wide",
+    layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS (TERMUK: HAPUS SIDEBAR 100%)
+# Custom CSS
 st.markdown("""
 <style>
     /* 1. BACKGROUND & COLORS */
@@ -50,16 +50,10 @@ st.markdown("""
         background-color: #161920;
     }
 
-    /* --- [PENTING] HAPUS SIDEBAR 100% --- */
-    [data-testid="stSidebar"] {
-        display: none;
-    }
-    [data-testid="collapsedControl"] {
-        display: none;
-    }
-    section[data-testid="stSidebarNav"] {
-        display: none;
-    }
+    /* --- HAPUS SIDEBAR --- */
+    [data-testid="stSidebar"] { display: none; }
+    [data-testid="collapsedControl"] { display: none; }
+    section[data-testid="stSidebarNav"] { display: none; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -242,6 +236,9 @@ class GodModeEngine:
 
 st.title("Stock Daytrade Analyzer")
 
+# Menambahkan Jarak Bawah agar judul tidak nempel dengan Form Input
+st.markdown("<div style='margin-bottom: 30px;'></div>", unsafe_allow_html=True)
+
 # --- INITIALIZE SESSION STATE ---
 if 'target_ticker' not in st.session_state:
     st.session_state['target_ticker'] = None
@@ -254,25 +251,22 @@ def set_ticker():
 # --- FORM INPUT (TOP PAGE) ---
 with st.container():
     with st.form(key='search_form', clear_on_submit=True):
-        col_in, col_btn = st.columns([4, 1])
+        col_in, col_btn = st.columns([3, 1], vertical_alignment="bottom")
         with col_in:
-            st.text_input("Ketik Kode Saham & Enter (Contoh: BBRI)", key="widget_input", placeholder="Masukkan Kode Saham...")
+            st.text_input("Masukkan Kode Saham & Enter (Contoh: BBRI)", key="widget_input", placeholder="Ketik Kode...")
         with col_btn:
-            st.form_submit_button("🚀 ANALISA", type="primary", on_click=set_ticker)
+            st.form_submit_button("START", type="primary", on_click=set_ticker)
 
 # --- EXECUTION LOGIC ---
 if st.session_state['target_ticker']:
     ticker_input = st.session_state['target_ticker'].upper()
     bot = GodModeEngine(ticker_input)
     
-    with st.status(f"🔍 Memindai Pasar: {ticker_input}...", expanded=True) as status:
-        st.write("📡 Mengambil Data Bursa...")
+    with st.spinner(f"⏳ Sedang Menganalisa {ticker_input}..."):
         fetch_status = bot.fetch_data()
         
         if fetch_status == "OK":
-            st.write("🧠 Menganalisa Data Saham...")
             res = bot.analyze_market()
-            status.update(label="✅ Analisa Selesai!", state="complete", expanded=False)
             
             # --- START DISPLAY RESULT ---
             d = res['data']
@@ -298,7 +292,7 @@ if st.session_state['target_ticker']:
             with c2:
                 st.markdown(f"<div class='{res['rec_class']}'><div class='huge-font'>{res['rec_text']}</div><div>SKOR KUALITAS: {res['score']}/100</div></div>", unsafe_allow_html=True)
 
-            # HASIL ANALISA (AUDIT)
+            # HASIL ANALISA (AUDIT) - FIX: Hapus Accordion, Jadi Container Biasa
             st.markdown("<br><h5>🔍 HASIL ANALISA</h5>", unsafe_allow_html=True)
             audit_html = '<div class="audit-box">'
             for r in res['reasons']:
@@ -370,13 +364,10 @@ if st.session_state['target_ticker']:
                 st.error("⛔ SETUP TIDAK VALID. Lihat Hasil Analisa di atas.")
         
         elif fetch_status == "EMPTY":
-            status.update(label="❌ Data Tidak Ditemukan", state="error", expanded=False)
             st.error(f"Saham kode '{ticker_input}' tidak ditemukan.")
         elif fetch_status == "FEW_DATA":
-            status.update(label="❌ Data Kurang", state="error", expanded=False)
             st.error("Data saham terlalu sedikit (Mungkin baru IPO).")
         else:
-            status.update(label="❌ System Error", state="error", expanded=False)
             st.error(f"Error: {fetch_status}")
 else:
     st.info("👆 Masukkan Kode Saham di atas (misal: ANTM) lalu tekan Enter.")
