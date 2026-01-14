@@ -50,7 +50,7 @@ st.markdown("""
         background-color: #161920;
     }
 
-    /* --- HAPUS SIDEBAR --- */
+    /* --- HAPUS SIDEBAR 100% --- */
     [data-testid="stSidebar"] { display: none; }
     [data-testid="collapsedControl"] { display: none; }
     section[data-testid="stSidebarNav"] { display: none; }
@@ -236,8 +236,8 @@ class GodModeEngine:
 
 st.title("Stock Daytrade Analyzer")
 
-# Menambahkan Jarak Bawah agar judul tidak nempel dengan Form Input
-st.markdown("<div style='margin-bottom: 30px;'></div>", unsafe_allow_html=True)
+# Jarak bawah agar judul tidak nempel input
+st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
 # --- INITIALIZE SESSION STATE ---
 if 'target_ticker' not in st.session_state:
@@ -256,6 +256,9 @@ with st.container():
             st.text_input("Masukkan Kode Saham & Enter (Contoh: BBRI)", key="widget_input", placeholder="Ketik Kode...")
         with col_btn:
             st.form_submit_button("START", type="primary", on_click=set_ticker)
+    
+    # INFO JAM OPTIMAL (DIBAWAH INPUT)
+    st.caption("💡 **Waktu Optimal:** Sesi 1 (09:15 - 11:30) & Sesi 2 (13:45 - 14:45) WIB. | Data Delay: ~15 Menit.")
 
 # --- EXECUTION LOGIC ---
 if st.session_state['target_ticker']:
@@ -280,8 +283,14 @@ if st.session_state['target_ticker']:
             server_now = datetime.now(timezone.utc)
             wib_now = server_now + timedelta(hours=7)
 
-            # HEADER INFO
-            st.markdown(f"### ⚡ HASIL SCAN: {ticker_input}")
+            # HEADER INFO & REFRESH BUTTON
+            col_head, col_ref = st.columns([3, 1], vertical_alignment="center")
+            with col_head:
+                st.markdown(f"### ⚡ HASIL SCAN: {ticker_input}")
+            with col_ref:
+                if st.button("🔄 Refresh Data"):
+                    st.rerun()
+
             st.markdown(f"🕒 Scan: {wib_now.strftime('%H:%M:%S')} WIB | ⏳ Status: {delay_txt}", unsafe_allow_html=True)
             st.divider()
 
@@ -292,7 +301,7 @@ if st.session_state['target_ticker']:
             with c2:
                 st.markdown(f"<div class='{res['rec_class']}'><div class='huge-font'>{res['rec_text']}</div><div>SKOR KUALITAS: {res['score']}/100</div></div>", unsafe_allow_html=True)
 
-            # HASIL ANALISA (AUDIT) - FIX: Hapus Accordion, Jadi Container Biasa
+            # HASIL ANALISA (AUDIT)
             st.markdown("<br><h5>🔍 HASIL ANALISA</h5>", unsafe_allow_html=True)
             audit_html = '<div class="audit-box">'
             for r in res['reasons']:
@@ -335,7 +344,12 @@ if st.session_state['target_ticker']:
 
                 p1, p2 = st.columns([1, 1])
                 with p1:
-                    st.markdown(f"<div class='plan-box'><span class='label-font c-cyan'>🛒 ENTRY AREA</span><br><span class='big-font'>{res['entry_min']:.0f} - {res['entry_max']:.0f}</span></div>", unsafe_allow_html=True)
+                    # LOGIKA ENTRY KEMBAR (FIXED)
+                    if res['entry_min'] == res['entry_max']:
+                        st.markdown(f"<div class='plan-box'><span class='label-font c-cyan'>🛒 ENTRY POINT</span><br><span class='big-font'>{res['entry_min']:.0f}</span><br><small>HARGA TEPAT DI SUPPORT</small></div>", unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"<div class='plan-box'><span class='label-font c-cyan'>🛒 ENTRY AREA</span><br><span class='big-font'>{res['entry_min']:.0f} - {res['entry_max']:.0f}</span></div>", unsafe_allow_html=True)
+                    
                     st.markdown(f"<div class='plan-box' style='border-color:#FF4B4B'><span class='label-font c-red'>🛡️ STOP LOSS</span><br><span class='big-font'>{res['sl']:.0f}</span><br><small>Risk: -{res['risk_pct']:.1f}%</small></div>", unsafe_allow_html=True)
 
                 with p2:
